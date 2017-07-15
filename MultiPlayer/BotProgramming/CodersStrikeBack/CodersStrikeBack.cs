@@ -45,8 +45,8 @@ public class Player {
     public int y { get; set; }
     public bool shieldUsed = false;
     public bool boostUsed = false;
+    public int availableShields = 3;
     public int thrust = 100;
-    private int breaking = 0;
     private Opponent opponent;
     private Checkpoint checkpoint;
 
@@ -62,7 +62,8 @@ public class Player {
         }
 
         if (shouldShield()) {
-            this.shieldUsed = true;
+            this.availableShields--;
+            if (this.availableShields == 0) this.shieldUsed = true;
             return "SHIELD";
         }
 
@@ -71,18 +72,37 @@ public class Player {
     }
 
     private int calcThrust() {
-        if (this.checkpoint.angle >= 135) {
-            return 40;
-        } else if (this.checkpoint.angle >= 90) {
-            return 70;
-        } else if (this.checkpoint.angle >= 45) {
-            return 90;
-        }
-        return 100;
-    }
+        int thrust;
+        int angle = this.checkpoint.angle;
+        int dist = this.checkpoint.dist;
 
-    private int calcBreaking() {
-        return 0;
+        if (dist < 3000) {
+            if (angle < 45) {
+                thrust = 70;
+            } else if (angle < 90) {
+                thrust = 50;
+            } else if (angle < 135) {
+                thrust = 30;
+            } else {
+                thrust = 20;
+            }
+        } else {
+            if (angle < 45) {
+                thrust = 100;
+            } else if (angle < 90) {
+                thrust = 90;
+            } else if (angle < 135) {
+                thrust = 40;
+            } else {
+                thrust = 20;
+            }
+        }
+
+        //thrust = (this.checkpoint.angle * 100) / 180;
+
+        if (thrust < 0) thrust = 0;
+        if (thrust > 100) thrust = 100;
+        return thrust;
     }
 
     private bool shouldBoost() {
@@ -94,7 +114,7 @@ public class Player {
     }
 
     private bool shouldShield() {
-        if (this.opponent.velocity > 200 && this.opponent.isApproaching && this.opponent.dist < 1000) {
+        if (this.opponent.velocity > 200 && this.opponent.isApproaching && this.opponent.dist < 1500) {
             return true;
         }
         return false;
@@ -175,8 +195,8 @@ public class Logger {
 
     public void log() {
         Console.Error.WriteLine("Player:______________________________ ");
-        Console.Error.WriteLine("X: " + player.x + " Y: " + player.y + " | Boost: " + player.boostUsed + " Shield: " + player.shieldUsed);
-        Console.Error.WriteLine("Thrust " + player.thrust );
+        Console.Error.WriteLine("X: " + player.x + " Y: " + player.y + " AvailableShields: " + player.availableShields + "/3");
+        Console.Error.WriteLine("Thrust " + player.thrust + " | Boost: " + player.boostUsed);
 
         Console.Error.WriteLine("Opponent:___________________________ ");
         Console.Error.WriteLine("Dist: " + opponent.dist + " Angle: " + opponent.angle);
@@ -185,12 +205,5 @@ public class Logger {
         Console.Error.WriteLine("Checkpoint:_________________________ ");
         Console.Error.WriteLine("NCX: " + checkpoint.x + " NCY: " + checkpoint.y);
         Console.Error.WriteLine("Dist: " + checkpoint.dist +  " Angle: " + checkpoint.angle);
-
-        // if (isLapMapped) {
-        //     Console.Error.WriteLine("Lap Mapping: COMPLETE_______________ ");
-        // } else {
-        //     Console.Error.WriteLine("Lap Mapping: IN PROGRESS____________ ");
-        // }
-        // Console.Error.WriteLine("Checkpoints: " + currentCheckpoint + "/" + countCheckpoints + " Laps: " + currentLap + "/" + totalLaps);
     }
 }
