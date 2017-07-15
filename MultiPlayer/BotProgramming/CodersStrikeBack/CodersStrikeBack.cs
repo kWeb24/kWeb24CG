@@ -5,184 +5,192 @@ using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 
-class Player {
+class Game {
+    private static Opponent opponent = new Opponent();
+    private static Checkpoint checkpoint = new Checkpoint();
+    private static Player player = new Player(opponent, checkpoint);
+    private static LapManager lapManager = new LapManager(checkpoint);
+    private static Logger logger = new Logger(player, opponent, checkpoint, lapManager);
+    private static bool logEnabled = true;
+
     static void Main(string[] args) {
-        string[] inputs;
-
-        string thrust = "0";
-        int tmpThrust = 0;
-        bool boostUsed = false;
-        bool isShielded = false;
-
-        int opponentDist = 0;
-        bool isApproaching = false;
-        int lastDist = 0;
-        int opponentVelocity = 0;
-        int opponentAngle = 0;
-
-        bool isLapMapped = false;
-        List<string> _checkpoints = new List<string>();
-        int countCheckpoints = 0;
-        int currentCheckpoint = 0;
-        int currentLap = 1;
-        const int totalLaps = 3;
-        int nextCheckpointXOld = 0;
-        bool isLapChanged = false;
-
         while (true) {
-            inputs = Console.ReadLine().Split(' ');
-            int x = int.Parse(inputs[0]);
-            int y = int.Parse(inputs[1]);
-            int nextCheckpointX = int.Parse(inputs[2]); // x position of the next check point
-            int nextCheckpointY = int.Parse(inputs[3]); // y position of the next check point
-            int nextCheckpointDist = int.Parse(inputs[4]); // distance to the next checkpoint
-            int nextCheckpointAngle = int.Parse(inputs[5]); // angle between your pod orientation and the direction of the next checkpoint
-            inputs = Console.ReadLine().Split(' ');
-            int opponentX = int.Parse(inputs[0]);
-            int opponentY = int.Parse(inputs[1]);
-
-            if (!isLapMapped) {
-                string mapResult = mapLaps(nextCheckpointX, nextCheckpointY, nextCheckpointAngle, nextCheckpointDist, _checkpoints);
-                if (mapResult == "DONE") {
-                    isLapMapped = true;
-                    currentLap++;
-                } else if (mapResult != "WAIT") {
-                    _checkpoints.Add(mapResult);
-                    countCheckpoints++;
-                    currentCheckpoint++;
-                }
-            } else {
-                if (updateCurrentLap(currentCheckpoint, countCheckpoints, isLapChanged) == 1) { isLapChanged = true; }
-                if (updateCurrentCheckpoint(currentCheckpoint, countCheckpoints, nextCheckpointXOld, nextCheckpointX) != currentCheckpoint) { isLapChanged = false; }
-                currentCheckpoint = updateCurrentCheckpoint(currentCheckpoint, countCheckpoints, nextCheckpointXOld, nextCheckpointX);
-                currentLap += updateCurrentLap(currentCheckpoint, countCheckpoints, isLapChanged);
-            }
-            nextCheckpointXOld = nextCheckpointX;
-
-            opponentDist = getEnemyDist(x, y, opponentX, opponentY);
-            isApproaching = isOpponentApproach(opponentDist, lastDist);
-            opponentVelocity = getApproachSpeed(opponentDist, lastDist);
-            lastDist = opponentDist;
-            opponentAngle = getOpponentAngle(x, y, opponentX, opponentY);
-
-            tmpThrust = calculateThrust(nextCheckpointAngle);
-            tmpThrust -= calculateBreaking(nextCheckpointDist, nextCheckpointAngle);
-            if (tmpThrust < 0) tmpThrust = 0;
-            if (tmpThrust > 100) tmpThrust = 100;
-            thrust = tmpThrust.ToString();
-            if (calculateBoost(boostUsed, nextCheckpointDist, nextCheckpointAngle, opponentDist, opponentVelocity, currentLap, totalLaps)) { thrust = "BOOST"; boostUsed = true; }
-            if (calculateShields(opponentVelocity, opponentDist, nextCheckpointDist)) { thrust = "SHIELD"; }
-
-            Console.Error.WriteLine("Input:______________________________ ");
-            Console.Error.WriteLine("X: " + x + " Y: " + y + " | OX: " + opponentX + " OY: " + opponentY);
-            Console.Error.WriteLine("NCX: " + nextCheckpointX + " NCY: " + nextCheckpointY + " Dist: " + nextCheckpointDist +  " Angle: " + nextCheckpointAngle);
-            Console.Error.WriteLine("Player:_____________________________ ");
-            Console.Error.WriteLine("Boost: " + boostUsed + " Shield: " + isShielded);
-            Console.Error.WriteLine("Breaking: " + calculateBreaking(nextCheckpointDist, nextCheckpointAngle) + " Thrust {TT: " + tmpThrust + " | RT: " + thrust + "}");
-            Console.Error.WriteLine("Opponent:___________________________ ");
-            Console.Error.WriteLine("Dist: " + opponentDist + " Angle: " + opponentAngle);
-            Console.Error.WriteLine("Approach: " + isApproaching + " ApSpeed: " + opponentVelocity);
-            Console.Error.WriteLine("Checkpoint:_________________________ ");
-            Console.Error.WriteLine("Dist: " + nextCheckpointDist + " Angle: " + nextCheckpointAngle);
-            if (isLapMapped) {
-                Console.Error.WriteLine("Lap Mapping: COMPLETE_______________ ");
-            } else {
-                Console.Error.WriteLine("Lap Mapping: IN PROGRESS____________ ");
-            }
-            Console.Error.WriteLine("Checkpoints: " + currentCheckpoint + "/" + countCheckpoints + " Laps: " + currentLap + "/" + totalLaps);
-
-            Console.WriteLine(nextCheckpointX + " " + nextCheckpointY + " " + thrust);
+            getInput();
+            opponent.exec();
+            string result = player.exec();
+            if (logEnabled) logger.log();
+            Console.WriteLine(checkpoint.x + " " + checkpoint.y + " " + result);
         }
     }
 
-    private static int calculateThrust(int nextCheckpointAngle) {
-        int thrust = 0;
-        if (nextCheckpointAngle < 0) nextCheckpointAngle *= -1;
+    private static void getInput() {
+        string[] inputs;
+        inputs = Console.ReadLine().Split(' ');
+        player.x = int.Parse(inputs[0]);
+        player.y = int.Parse(inputs[1]);
+        checkpoint.x = int.Parse(inputs[2]);
+        checkpoint.y = int.Parse(inputs[3]);
+        checkpoint.dist = int.Parse(inputs[4]);
+        checkpoint.setAngle(int.Parse(inputs[5]));
+        inputs = Console.ReadLine().Split(' ');
+        opponent.x = int.Parse(inputs[0]);
+        opponent.y = int.Parse(inputs[1]);
+        opponent.playerX = player.x;
+        opponent.playerY = player.y;
+    }
+}
 
-        if (nextCheckpointAngle > 140) {
-            thrust = 100;
-        } else if (nextCheckpointAngle > 90) {
-            thrust = 100;
-        } else {
-            thrust = 100;
-        }
+public class Player {
+    public int x { get; set; }
+    public int y { get; set; }
+    public bool shieldUsed = false;
+    public bool boostUsed = false;
+    public int thrust = 100;
+    private int breaking = 0;
+    private Opponent opponent;
+    private Checkpoint checkpoint;
 
-
-        if (thrust < 0) thrust = 0;
-        if (thrust > 100) thrust = 100;
-        return thrust;
+    public Player(Opponent opponent, Checkpoint checkpoint) {
+        this.opponent = opponent;
+        this.checkpoint = checkpoint;
     }
 
-    private static int calculateBreaking(int nextCheckpointDist, int nextCheckpointAngle) {
-
-        if (nextCheckpointDist < 4000 && nextCheckpointAngle > 15) {
-            return 80;
+    public string exec() {
+        if (shouldBoost()) {
+            this.boostUsed = true;
+            return "BOOST";
         }
 
+        if (shouldShield()) {
+            this.shieldUsed = true;
+            return "SHIELD";
+        }
+
+        this.thrust = calcThrust();
+        return this.thrust.ToString();
+    }
+
+    private int calcThrust() {
+        if (this.checkpoint.angle >= 135) {
+            return 40;
+        } else if (this.checkpoint.angle >= 90) {
+            return 70;
+        } else if (this.checkpoint.angle >= 45) {
+            return 90;
+        }
+        return 100;
+    }
+
+    private int calcBreaking() {
         return 0;
     }
 
-    private static bool calculateBoost(bool boostUsed, int nextCheckpointDist, int nextCheckpointAngle, int opponentDist, int opponentVelocity, int currentLap, int totalLaps) {
-        if ((!boostUsed) && /*(currentLap != 1) &&*/ (nextCheckpointDist > 8000) && (nextCheckpointAngle < 5) && (nextCheckpointAngle > -5) && ((opponentDist > 800))) {
+    private bool shouldBoost() {
+        if (this.boostUsed) return false;
+        if (this.checkpoint.angle < 5 && this.checkpoint.dist > 5000) {
             return true;
-        } else if ((!boostUsed) && (currentLap == totalLaps) && (nextCheckpointAngle < 5) && (nextCheckpointAngle > -5)) {
-            return true;
-        } else {
-            return false;
         }
+        return false;
     }
 
-    private static bool calculateShields(int opponentVelocity, int opponentDist, int nextCheckpointDist) {
-        if (opponentVelocity > 100 && opponentDist < 800) { return true; } else { return false; }
+    private bool shouldShield() {
+        if (this.opponent.velocity > 200 && this.opponent.isApproaching && this.opponent.dist < 1000) {
+            return true;
+        }
+        return false;
+    }
+}
+
+public class Opponent {
+    public int x { get; set; }
+    public int y { get; set; }
+    public int dist { get; set; }
+    public int velocity { get; set; }
+    public int angle { get; set; }
+    public bool isApproaching { get; set; }
+    public int playerX { get; set; }
+    public int playerY { get; set; }
+    private int lastDist = 0;
+
+    public void exec() {
+        this.dist = calcDist();
+        this.angle = calcAngle();
+        this.velocity = approachSpeed();
+        this.isApproaching = calcIsApproaching();
+        this.lastDist = this.dist;
     }
 
-    private static int getEnemyDist(int x, int y, int opponentX, int opponentY) {
-        double a = (double)(opponentX - x);
-        double b = (double)(opponentY - y);
+    private int calcDist() {
+        double a = (double)(this.x - this.playerX);
+        double b = (double)(this.y - this.playerY);
         return (int)Math.Sqrt((a * a) + (b * b));
     }
 
-    private static bool isOpponentApproach(int opponentDist, int lastOpponentDist) {
-        return opponentDist < lastOpponentDist ? true : false;
-    }
-
-    private static int getApproachSpeed(int opponentDist, int lastOpponentDist) {
-        return opponentDist < lastOpponentDist ? (lastOpponentDist - opponentDist) : 0;
-    }
-
-    /* to fix */
-    private static int getOpponentAngle(int x, int y, int opponentX, int opponentY) {
-        int deltaY = opponentY - y;
-        int deltaX = opponentX - x;
+    private int calcAngle() {
+        int deltaX = this.x - this.playerX;
+        int deltaY = this.y - this.playerY;
         return (int)(Math.Atan2(deltaY, deltaX) * (180 / Math.PI) );
     }
 
-    private static string mapLaps(int nextCheckpointX, int nextCheckpointY, int nextCheckpointAngle, int nextCheckpointDist, List<string> _checkpoints) {
-        if (_checkpoints.Count > 0) {
-            string[] firstCheckpoint = _checkpoints[0].Split(';');
-            string[] lastCheckpoint = _checkpoints[_checkpoints.Count -1].Split(';');
-
-            if (firstCheckpoint[0] == nextCheckpointX.ToString() && firstCheckpoint[1] == nextCheckpointY.ToString() && _checkpoints.Count > 1) {
-                return "DONE";
-            }
-
-            if (lastCheckpoint[0] == nextCheckpointX.ToString() && lastCheckpoint[1] == nextCheckpointY.ToString()) {
-                return "WAIT";
-            }
-        }
-
-        return nextCheckpointX.ToString() + ";" + nextCheckpointY.ToString() + ";" + nextCheckpointAngle.ToString() + ";" + nextCheckpointDist.ToString();
-    }
-    /*to doooo */
-    private static int updateCurrentCheckpoint(int currentCheckpoint, int countCheckpoints, int nextCheckpointXOld, int nextCheckpointX) {
-        if (nextCheckpointXOld != nextCheckpointX) {
-            return currentCheckpoint == countCheckpoints ? 1 : currentCheckpoint + 1;
-        }
-        return currentCheckpoint;
+    private bool calcIsApproaching() {
+        return this.dist < lastDist ? true : false;
     }
 
-    private static int updateCurrentLap (int currentCheckpoint, int countCheckpoints, bool isLapChanged) {
-        return (currentCheckpoint == countCheckpoints && !isLapChanged) ? 1 : 0;
+    private int approachSpeed() {
+        return this.dist < this.lastDist ? (this.lastDist - this.dist) : 0;
+    }
+}
+
+public class Checkpoint {
+    public int x { get; set; }
+    public int y { get; set; }
+    public int dist { get; set; }
+    public int angle { get; set; }
+
+    public void setAngle(int angle) {
+        this.angle = angle < 0 ? (angle * -1) : angle;
+    }
+}
+
+public class LapManager {
+    Checkpoint checkpoint;
+
+    public LapManager(Checkpoint checkpoint) {
+        this.checkpoint = checkpoint;
+    }
+}
+
+public class Logger {
+    private Player player;
+    private Opponent opponent;
+    private Checkpoint checkpoint;
+    private LapManager lapManager;
+
+    public Logger(Player player, Opponent opponent, Checkpoint checkpoint, LapManager lapManager) {
+        this.player = player;
+        this.opponent = opponent;
+        this.checkpoint = checkpoint;
+        this.lapManager = lapManager;
     }
 
+    public void log() {
+        Console.Error.WriteLine("Player:______________________________ ");
+        Console.Error.WriteLine("X: " + player.x + " Y: " + player.y + " | Boost: " + player.boostUsed + " Shield: " + player.shieldUsed);
+        Console.Error.WriteLine("Thrust " + player.thrust );
+
+        Console.Error.WriteLine("Opponent:___________________________ ");
+        Console.Error.WriteLine("Dist: " + opponent.dist + " Angle: " + opponent.angle);
+        Console.Error.WriteLine("Approach: " + opponent.isApproaching + " ApSpeed: " + opponent.velocity);
+
+        Console.Error.WriteLine("Checkpoint:_________________________ ");
+        Console.Error.WriteLine("NCX: " + checkpoint.x + " NCY: " + checkpoint.y);
+        Console.Error.WriteLine("Dist: " + checkpoint.dist +  " Angle: " + checkpoint.angle);
+
+        // if (isLapMapped) {
+        //     Console.Error.WriteLine("Lap Mapping: COMPLETE_______________ ");
+        // } else {
+        //     Console.Error.WriteLine("Lap Mapping: IN PROGRESS____________ ");
+        // }
+        // Console.Error.WriteLine("Checkpoints: " + currentCheckpoint + "/" + countCheckpoints + " Laps: " + currentLap + "/" + totalLaps);
+    }
 }
