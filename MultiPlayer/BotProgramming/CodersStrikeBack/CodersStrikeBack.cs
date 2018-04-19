@@ -76,25 +76,37 @@ public class Player {
         int angle = this.checkpoint.angle;
         int dist = this.checkpoint.dist;
 
-        if (dist < 3000) {
-            if (angle < 45) {
+        if (dist < 2500) {
+            if (angle < 10) {
+                thrust = 100;
+            } else if (angle < 45) {
                 thrust = 70;
             } else if (angle < 90) {
-                thrust = 50;
-            } else if (angle < 135) {
-                thrust = 30;
-            } else {
                 thrust = 20;
+            } else if (angle < 135) {
+                thrust = 10;
+            } else {
+                thrust = 10;
+            }
+        } else if (dist < 3500) {
+            if (angle < 45) {
+                thrust = 100;
+            } else if (angle < 90) {
+                thrust = 80;
+            } else if (angle < 135) {
+                thrust = 60;
+            } else {
+                thrust = 40;
             }
         } else {
             if (angle < 45) {
                 thrust = 100;
             } else if (angle < 90) {
-                thrust = 90;
+                thrust = 80;
             } else if (angle < 135) {
-                thrust = 40;
+                thrust = 70;
             } else {
-                thrust = 20;
+                thrust = 60;
             }
         }
 
@@ -107,14 +119,17 @@ public class Player {
 
     private bool shouldBoost() {
         if (this.boostUsed) return false;
-        if (this.checkpoint.angle < 5 && this.checkpoint.dist > 5000) {
+        if (this.checkpoint.angle < 35 && this.checkpoint.dist > 6000) {
             return true;
         }
         return false;
     }
 
     private bool shouldShield() {
-        if (this.opponent.velocity > 200 && this.opponent.isApproaching && this.opponent.dist < 1500) {
+        if (this.opponent.velocity > 350 && this.opponent.isApproaching && this.opponent.dist < 1300) {
+            return true;
+        }
+        if (this.opponent.dist < 1300 && this.checkpoint.dist < 1300 && this.opponent.velocity > 250 && this.opponent.angle > 30) {
             return true;
         }
         return false;
@@ -149,7 +164,8 @@ public class Opponent {
     private int calcAngle() {
         int deltaX = this.x - this.playerX;
         int deltaY = this.y - this.playerY;
-        return (int)(Math.Atan2(deltaY, deltaX) * (180 / Math.PI) );
+        int angle = (int)(Math.Atan2(deltaY, deltaX) * (180 / Math.PI));
+        return angle < 0 ? angle * -1 : angle;
     }
 
     private bool calcIsApproaching() {
